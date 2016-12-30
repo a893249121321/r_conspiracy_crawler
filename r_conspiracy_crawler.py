@@ -10,10 +10,12 @@ def create_reddit_instance():
                                   client_secret=CLIENT_SECRET)
     return reddit_instance
 
+
 def collect_posts_for_subreddit(reddit_instance, subreddit_name='conspiracy'):
     for submission in reddit_instance.subreddit(subreddit_name).new():
         print(submission)
     return
+
 
 reddit_instance = create_reddit_instance()
 collect_posts_for_subreddit(reddit_instance)
