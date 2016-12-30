@@ -1,7 +1,10 @@
 import praw
+import pymysql
 import sqlalchemy
+from pymysql import IntegrityError
 from sqlalchemy import MetaData
 from sqlalchemy import create_engine
+from datetime import datetime, timezone
 
 
 def create_reddit_instance():
@@ -21,15 +24,26 @@ class MySQL_Writer:
         self.job_postings = sqlalchemy.Table('submissions', self.metadata, autoload=True)
 
     def insert_into_mysql(self, id, author, score, created, title, num_comments, ups, downs):
-        command = f"INSERT INTO job_postings VALUES ('{id}', '{author}', '{score}', '{created}', '{title}', '{num_comments}', {ups}, {downs})"
-        self.engine.execute(command)
+        command = f"INSERT INTO submissions VALUES ('{id}', '{author}', '{score}', '{created}', '{title}', '{num_comments}', {ups}, {downs});"
+        try:
+            self.engine.execute(command)
+        except sqlalchemy.exc.IntegrityError:
+            pass # Duplicate found.
 
 
 def collect_posts_for_subreddit(mysql_writer, reddit_instance, subreddit_name='conspiracy'):
     for submission in reddit_instance.subreddit(subreddit_name).new():
-        mysql_writer.insert_into_mysql(submission.id, submission.author, submission.score,
-                                       submission.created, submission.title, submission.num_comments,
-                                       submission.ups, submission.downs)
+        utc_time = datetime.fromtimestamp(submission.created, timezone.utc)
+        local_time = utc_time.astimezone()
+        created = local_time.strftime("%Y-%m-%d %H:%M:%S")
+        mysql_writer.insert_into_mysql(submission.id,
+                                       str(submission.author).encode('latin-1', errors='replace').decode('latin-1'),
+                                       submission.score,
+                                       created,
+                                       submission.title.encode('latin-1', errors='replace').decode('latin-1').replace('\'', '"').replace('%', '%%'),
+                                       submission.num_comments,
+                                       submission.ups,
+                                       submission.downs)
     return
 
 
